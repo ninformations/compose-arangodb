@@ -1,0 +1,72 @@
+version: '3.3'
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - arangonet
+
+  agency:
+      image: arangodb/arangodb
+      environment:
+          - ARANGO_ROOT_PASSWORD=openSesame
+      command: --server.jwt-secret=openSesameJWT --database.password openSesame --server.endpoint tcp://0.0.0.0:5001 --agency.activate true --agency.size 1 --agency.supervision true
+      networks:
+          - arangonet
+
+  coordinator:
+      image: arangodb/arangodb
+      environment:
+          - ARANGO_ROOT_PASSWORD=openSesame
+          - VIRTUAL_HOST=arango.local
+      command: --server.jwt-secret=openSesameJWT --database.password openSesame --server.endpoint tcp://0.0.0.0:8529 --cluster.my-address tcp://coordinator:8529 --cluster.my-role COORDINATOR --cluster.agency-endpoint tcp://agency:5001
+      depends_on:
+          - agency
+          - nginx-proxy
+      networks:
+          - arangonet
+
+  coordinator2:
+      image: arangodb/arangodb
+      environment:
+          - ARANGO_ROOT_PASSWORD=openSesame
+          - VIRTUAL_HOST=arango.local
+      command: --server.jwt-secret=openSesameJWT --database.password openSesame --server.endpoint tcp://0.0.0.0:8529 --cluster.my-address tcp://coordinator2:8529 --cluster.my-role COORDINATOR --cluster.agency-endpoint tcp://agency:5001
+      depends_on:
+          - agency
+          - nginx-proxy
+      networks:
+          - arangonet
+
+  coordinator3:
+      image: arangodb/arangodb
+      environment:
+          - ARANGO_ROOT_PASSWORD=openSesame
+          - VIRTUAL_HOST=arango.local
+      command: --server.jwt-secret=openSesameJWT --database.password openSesame --cluster.my-address tcp://coordinator3:8529 --server.endpoint tcp://0.0.0.0:8529 --cluster.my-role COORDINATOR --cluster.agency-endpoint tcp://agency:5001
+      depends_on:
+          - agency
+          - nginx-proxy
+      networks:
+          - arangonet
+  db:
+      build: ./docker/platform/arango
+      environment:
+          - ARANGO_ROOT_PASSWORD=openSesame
+      command: --server.jwt-secret=openSesameJWT --database.password openSesame --server.endpoint tcp://0.0.0.0:8529 --cluster.my-role PRIMARY --cluster.agency-endpoint tcp://agency:5001
+      depends_on:
+          - agency
+      networks:
+          - arangonet
+    #   volumes:
+    #     - arangodata:/var/lib/arangodb3
+networks:
+  arangonet:
+    driver: bridge
+
+# volumes:
+#   arangodata:
+#     driver: local
